@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Check the command dependency
-CMDS="date rsync find gpg tar"
+CMDS="mysqldump gzip date rsync find gpg tar"
 for i in $CMDS
 do
   command -v $i >/dev/null && continue || { echo "$i command not found."; exit 1; }
@@ -13,10 +13,12 @@ done
 ################################################################################
 
 # Variable to configure
-USER="aadlani"
-EMAIL="anouar@adlani.com"
-BACKUP_HOME="/Users/$USER/backups"
-BACKUP_SOURCE_DIR="/Users/$USER/Documents"
+EMAIL="daslampe@lano-crew.org"
+MYSQL_USER="root"
+MYSQL_PASS=""
+BACKUP_HOME="/mnt/backups"
+BACKUP_SOURCE_DIRS="/srv/http"
+EXCLUDE_DIRS="tmp,vendor"
 
 # Dates
 NOW=$(date +%Y%m%d%H%M)               #YYYYMMDDHHMM
@@ -42,13 +44,20 @@ mkdir -p $SNAPSHOT_DIR  $DAILY_ARCHIVES_DIR $WEEKLY_ARCHIVES_DIR $MONTHLY_ARCHIV
 touch $LOGFILE
 printf "[%12d] Backup started\n" $NOW >> $LOGFILE
 
+
 ################################################################################
 # Step #1: Retreive files to create snapshots with RSYNC.
 ################################################################################
 
-rsync -azH --link-dest=$CURRENT_LINK  $BACKUP_SOURCE_DIR $SNAPSHOT_DIR/$NOW \
+rsync -azH --link-dest=$CURRENT_LINK $(eval "echo --exclude={$EXCLUDE_DIRS}") $BACKUP_SOURCE_DIRS $SNAPSHOT_DIR/$NOW \
   && ln -snf $(ls -1d $SNAPSHOT_DIR/* | tail -n1) $CURRENT_LINK \
-  && printf "\t- Copy from %s to %s successfull \n" $BACKUP_SOURCE_DIR $SNAPSHOT_DIR/$NOW >> $LOGFILE
+  && printf "\t- Copy from %s to %s successfull \n" $BACKUP_SOURCE_DIRS $SNAPSHOT_DIR/$NOW >> $LOGFILE
+
+################################################################################
+# Step #1.1: Create mysqldump and add to snapshot
+################################################################################
+mysqldump -u $MYSQL_USER -p $MYSQL_PASS --all-databases | gzip > $SNAPSHOT_DIR/$NOW/mysqldump-$NOW.sql.gz \
+	&& printf "\t- Create mysqldump in %s successfull \n" $SNAPSHOT_DIR/$NOW/mysqldump-$NOW.sql.gz >> $LOGFILE
 
 ################################################################################
 # Step #2: Group and Compress the previous snaphots per days
